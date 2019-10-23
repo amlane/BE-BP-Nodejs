@@ -11,7 +11,7 @@
 
 ### Add your dependencies
 
-- `npm i express helmet cors knex sqlite3 dotenv bcryptjs* jsonwebtoken*`
+- `npm i express helmet cors knex sqlite3 dotenv pg bcryptjs* jsonwebtoken*`
 - `npm i nodemon -D`
 
 `* only if using database with login/register`
