@@ -6,7 +6,7 @@
 
 - `mkdir < server-directory-name >`
 - `git init`
-- `npx gitignore node` //creates git.ignore for node
+- `npx gitignore node` //creates .gitignore for node
 - `npm init -y` //creates package.json
 
 ### Add your dependencies
