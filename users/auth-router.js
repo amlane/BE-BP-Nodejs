@@ -5,48 +5,49 @@ const secrets = require("../config/secrets.js");
 
 const Users = require("./users-model.js");
 
-// for endpoints beginning with /api/auth
-router.post("/register", validateUserContent, (req, res) => {
-  let user = req.body;
-  const hash = bcrypt.hashSync(user.password, 10); // 2 ^ n
-  user.password = hash;
+const BCRYPT_ROUNDS = 12;
 
-  Users.add(user)
-    .then(saved => {
-      const token = generateToken(saved);
-      res.status(201).json({
-        saved,
-        message: `${saved.username}`,
-        token
-      });
-    })
-    .catch(error => {
-      res.status(500).json(error);
+// for endpoints beginning with /api/auth
+router.post("/register", validateUserContent, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    const saved = await Users.add({ username, password: hash });
+    const token = generateToken(saved);
+
+    res.status(201).json({
+      user: saved,
+      message: `Welcome, ${saved.username}`,
+      token
     });
+  } catch (error) {
+    if (error.code === "SQLITE_CONSTRAINT" || error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({ message: "Username is already taken" });
+    }
+    res.status(500).json({ message: "Failed to register user" });
+  }
 });
 
-router.post("/login", validateUserContent, (req, res) => {
-  let { username, password } = req.body;
+router.post("/login", validateUserContent, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await Users.findBy({ username }).first();
 
-  Users.findBy({ username })
-    .first()
-    .then(user => {
-      if (user && bcrypt.compareSync(password, user.password)) {
-        // generate token
-        const token = generateToken(user);
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = generateToken(user);
 
-        res.status(200).json({
-          user,
-          message: `${user.username}`,
-          token //return the token upon login
-        });
-      } else {
-        res.status(401).json({ message: "Invalid Username or Password" });
-      }
-    })
-    .catch(error => {
-      res.status(500).json(error);
-    });
+      res.status(200).json({
+        user: { id: user.id, username: user.username },
+        message: `Welcome back, ${user.username}`,
+        token
+      });
+    } else {
+      res.status(401).json({ message: "Invalid Username or Password" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Failed to log in" });
+  }
 });
 
 // ---------------------- Generate Token ---------------------- //
@@ -65,7 +66,14 @@ function generateToken(user) {
 // ---------------------- Custom Middleware ---------------------- //
 
 function validateUserContent(req, res, next) {
-  if (!req.body.username || !req.body.password) {
+  const { username, password } = req.body || {};
+
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    !username.trim() ||
+    !password.trim()
+  ) {
     res
       .status(400)
       .json({ message: "Username & password fields are required." });
